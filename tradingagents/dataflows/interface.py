@@ -147,6 +147,7 @@ def route_to_vendor(method: str, *args, **kwargs):
         if vendor not in fallback_vendors:
             fallback_vendors.append(vendor)
 
+    last_error = None
     for vendor in fallback_vendors:
         if vendor not in VENDOR_METHODS[method]:
             continue
@@ -156,7 +157,20 @@ def route_to_vendor(method: str, *args, **kwargs):
 
         try:
             return impl_func(*args, **kwargs)
-        except AlphaVantageRateLimitError:
-            continue  # Only rate limits trigger fallback
+        except AlphaVantageRateLimitError as e:
+            # Hard rate limit — silently fall through to next vendor.
+            last_error = e
+            continue
+        except ValueError as e:
+            # E.g. "Indicator X not supported by this vendor". Fall through
+            # to the next vendor (other vendors may support the indicator)
+            # rather than letting the error reach the agent. This preserves
+            # vendor parity even when catalogs differ.
+            last_error = e
+            continue
 
+    if last_error is not None:
+        raise RuntimeError(
+            f"No available vendor for '{method}' — last error: {last_error}"
+        )
     raise RuntimeError(f"No available vendor for '{method}'")
