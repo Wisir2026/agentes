@@ -65,6 +65,10 @@ def yf_retry(func, max_retries=3, base_delay=2.0):
 
 def _clean_dataframe(data: pd.DataFrame) -> pd.DataFrame:
     """Normalize a stock DataFrame for stockstats: parse dates, drop invalid rows, fill price gaps."""
+    # Empty inputs short-circuit — the rename/parse/fillna steps below all
+    # assume at least one row exists and will raise KeyError on Date access.
+    if data.empty:
+        return data
     # The cached CSVs from yfinance.reset_index() are written with the date
     # column named "index" instead of "Date" depending on yfinance version.
     # Normalize so downstream code can always rely on "Date".
